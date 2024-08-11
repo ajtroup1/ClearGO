@@ -9,7 +9,7 @@ import (
 	"github.com/ajtroup1/clearv2/token"
 )
 
-const PROMPT = "Monkey >> "
+const PROMPT = "Clear >> "
 
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)

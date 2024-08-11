@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ajtroup1/clearv2/ast"
@@ -140,7 +141,7 @@ func TestIntegerLiteralExpression(t *testing.T) {
 		t.Fatalf(Red+"program has not enough statements. got=%d"+Reset,
 			len(program.Statements))
 	}
-	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement) // type assertion. checks the type and possibly casts it to *ast.Exp... ok holds whether this was successful
 	if !ok {
 		t.Fatalf(Red+"program.Statements[0] is not ast.ExpressionStatement. got=%T"+Reset,
 			program.Statements[0])
@@ -153,10 +154,125 @@ func TestIntegerLiteralExpression(t *testing.T) {
 		t.Errorf(Red+"literal.Value not %d. got=%d"+Reset, 5, literal.Value)
 	}
 	if literal.TokenLiteral() != "5" {
-		t.Errorf(Red+"literal.TokenLiteral not %s. got=%s", "5"+Reset,
+		t.Errorf(Red+"literal.TokenLiteral not %s. got=%s"+Reset, Yellow+"5"+Reset,
 			literal.TokenLiteral())
 	} else {
 		t.Logf(Green+"Test passed for integer literal: %s"+Reset, literal.TokenLiteral())
+	}
+}
+
+func TestParsingPrefixExpressions(t *testing.T) {
+	prefixTests := []struct {
+		input        string
+		operator     string
+		integerValue int64
+	}{
+		{"!5;", "!", 5},
+		{"-15;", "-", 15},
+	}
+	for _, tt := range prefixTests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
+		if len(program.Statements) != 1 {
+			t.Fatalf(Red+"program.Statements does not contain %d statements. got=%d\n"+Reset,
+				1, len(program.Statements))
+		}
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf(Red+"program.Statements[0] is not ast.ExpressionStatement. got=%T"+Reset,
+				program.Statements[0])
+		}
+		exp, ok := stmt.Expression.(*ast.PrefixExpression)
+		if !ok {
+			t.Fatalf(Red+"stmt is not ast.PrefixExpression. got=%T"+Reset, stmt.Expression)
+		}
+		if exp.Operator != tt.operator {
+			t.Fatalf(Red+"exp.Operator is not '%s'. got=%s"+Reset,
+				tt.operator, exp.Operator)
+		}
+		if !testIntegerLiteral(t, exp.Right, tt.integerValue) {
+			return
+		} else {
+			t.Logf(Green+"Test passed for prefix operator: %s"+Reset, exp.Operator)
+		}
+	}
+}
+
+func TestOperatorPrecedenceParsing(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			"-a * b",
+			"((-a) * b)",
+		},
+		{
+			"!-a",
+			"(!(-a))",
+		},
+		{
+			"a + b + c",
+			"((a + b) + c)",
+		},
+		{
+			"a + b - c",
+			"((a + b) - c)",
+		},
+		{
+			"a * b * c",
+			"((a * b) * c)",
+		},
+		{
+			"a * b / c",
+			"((a * b) / c)",
+		},
+		{
+			"a + b / c",
+			"(a + (b / c))",
+		},
+		{
+			"a + b * c + d / e - f",
+			"(((a + (b * c)) + (d / e)) - f)",
+		},
+		{
+			"3 + 4; -5 * 5",
+			"(3 + 4)((-5) * 5)",
+		},
+		{
+			"5 > 4 == 3 < 4",
+			"((5 > 4) == (3 < 4))",
+		},
+		{
+			"5 < 4 != 3 > 4",
+			"((5 < 4) != (3 > 4))",
+		},
+		{
+			"3 + 4 * 5 == 3 * 1 + 4 * 5",
+			"((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+		},
+		{
+			"3 + 4 * 5 == 3 * 1 + 4 * 5",
+			"((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+		},
+	}
+	passCount := 0
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
+		actual := program.String()
+		if actual != tt.expected {
+			t.Errorf(Red+"expected=%q, got=%q"+Reset, tt.expected, actual)
+		} else {
+			passCount++
+		}
+	}
+	if passCount > 0 {
+		t.Logf(Green+"%d/%d infix operator tests passed"+Reset, passCount, len(tests))
 	}
 }
 
@@ -172,4 +288,22 @@ func checkParserErrors(t *testing.T, p *Parser) {
 		t.Errorf(Red+"parser error: %q"+Reset, msg)
 	}
 	t.FailNow()
+}
+
+func testIntegerLiteral(t *testing.T, il ast.Expression, value int64) bool {
+	integ, ok := il.(*ast.IntegerLiteral)
+	if !ok {
+		t.Errorf("il not *ast.IntegerLiteral. got=%T", il)
+		return false
+	}
+	if integ.Value != value {
+		t.Errorf("integ.Value not %d. got=%d", value, integ.Value)
+		return false
+	}
+	if integ.TokenLiteral() != fmt.Sprintf("%d", value) {
+		t.Errorf("integ.TokenLiteral not %d. got=%s", value,
+			integ.TokenLiteral())
+		return false
+	}
+	return true
 }
