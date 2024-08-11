@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ajtroup1/clearv2/ast"
 	"github.com/ajtroup1/clearv2/lexer"
@@ -9,16 +10,15 @@ import (
 )
 
 const (
-_ int = iota
-LOWEST
-EQUALS // ==
-LESSGREATER // > or <
-SUM // +
-PRODUCT // *
-PREFIX // -X or !X
-CALL // myFunction(X)
+	_ int = iota
+	LOWEST
+	EQUALS      // ==
+	LESSGREATER // > or <
+	SUM         // +
+	PRODUCT     // *
+	PREFIX      // -X or !X
+	CALL        // myFunction(X)
 )
-
 
 type (
 	// prefixParseFn is a function that parses expressions with a prefix operator.
@@ -52,6 +52,7 @@ func New(l *lexer.Lexer) *Parser {
 
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	p.registerPrefix(token.IDENT, p.parseIdentifier)
+	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 
 	// Read two tokens, so curToken and peekToken are both set
 	p.nextToken()
@@ -131,7 +132,7 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
-	
+
 	return stmt
 }
 func (p *Parser) parseExpression(precedence int) ast.Expression {
@@ -142,6 +143,17 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	leftExpr := prefix()
 
 	return leftExpr
+}
+func (p *Parser) parseIntegerLiteral() ast.Expression {
+	lit := &ast.IntegerLiteral{Token: p.curToken}
+	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+	lit.Value = value
+	return lit
 }
 func (p *Parser) curTokenIs(t token.TokenType) bool {
 	return p.curToken.Type == t
