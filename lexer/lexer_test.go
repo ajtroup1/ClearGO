@@ -6,6 +6,13 @@ import (
 	"github.com/ajtroup1/clearv2/token"
 )
 
+const (
+	Red    = "\033[31m"
+	Yellow = "\033[33m"
+	Green  = "\033[32m"
+	Reset  = "\033[0m"
+)
+
 func TestNextToken(t *testing.T) {
 	input := `let five = 5;
 	let ten = 10;
