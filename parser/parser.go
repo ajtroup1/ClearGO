@@ -81,6 +81,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.FALSE, p.parseBoolean)
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
 	p.registerPrefix(token.IF, p.parseIfExpression)
+	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
 
 	// Register all infix parsing functions
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
@@ -260,7 +261,7 @@ func (p *Parser) parseBoolean() ast.Expression {
 	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.TRUE)}
 }
 
-// Parses an expression enclosed in parentheses
+// Parses an expression encased in parentheses
 func (p *Parser) parseGroupedExpression() ast.Expression {
 	// Advance past open parenthesis
 	p.nextToken()
@@ -290,13 +291,15 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	if !p.expectPeek(token.RPAREN) {
 		return nil
 	}
+
+	// Check for required consequence
 	if !p.expectPeek(token.LBRACE) {
 		return nil
 	}
 
 	expression.Consequence = p.parseBlockStatement()
 
-	// This code optionally parses an else expression, or alternative
+	// Optionally parses an else expression, or alternative
 	if p.peekTokenIs(token.ELSE) { // If the if expression contains an else
 		p.nextToken()
 		// Must contain a left brace to encase alternative
@@ -326,6 +329,54 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 		p.nextToken()
 	}
 	return block
+}
+
+// Parses a function literal expression
+func (p *Parser) parseFunctionLiteral() ast.Expression {
+	// Instantiate the function object
+	lit := &ast.FunctionLiteral{Token: p.curToken}
+
+	// Parse the parameters, which are encased in parentheses and separated by commas
+	if !p.expectPeek(token.LPAREN) {
+		return nil
+	}
+	lit.Parameters = p.parseFunctionParameters()
+	if !p.expectPeek(token.LBRACE) {
+		return nil
+	}
+
+	// Parse the function body, which is just a block statement
+	lit.Body = p.parseBlockStatement()
+	return lit
+}
+
+// Parses the parameter list as a slice of identifier for a function literal
+func (p *Parser) parseFunctionParameters() []*ast.Identifier {
+	identifiers := []*ast.Identifier{}
+
+	// Check if the parameter list is empty (right paren immedietely follows left paren: "fn()")
+	if p.peekTokenIs(token.RPAREN) {
+		p.nextToken()
+		// If so, return the empty slice
+		return identifiers
+	}
+	p.nextToken()
+	// Instantiate first parameter as an identifier and add it to the slice
+	ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, ident)
+	for p.peekTokenIs(token.COMMA) { // Continue to parse params checking if there is another listed ahead
+		// Consume ident and comma
+		p.nextToken()
+		p.nextToken()
+		// Instantiate next param
+		ident := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+		identifiers = append(identifiers, ident)
+	}
+	// Must conclude param list with right paren
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+	return identifiers
 }
 
 // Check for if the CURRENT token matches the sent token type (param)
