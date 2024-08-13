@@ -1,3 +1,6 @@
+// This is the parser for the Clear programming language
+// It uses Vaughan Pratt's "top "down operator precedence" parser defined here: https://dl.acm.org/doi/pdf/10.1145/512927.512931
+
 package parser
 
 import (
@@ -9,18 +12,20 @@ import (
 	"github.com/ajtroup1/clearv2/token"
 )
 
+// Iota of precedences representing their integer 'powers'
 const (
 	_ int = iota
-	LOWEST
-	EQUALS      // ==
-	LESSGREATER // > or <
-	SUM         // +
-	PRODUCT     // *
-	PREFIX      // -X or !X
-	CALL        // myFunction(X)
+	LOWEST      // Lowest precedence level, used as a base
+	EQUALS      // Precedence level for '==' and '!='
+	LESSGREATER // Precedence level for '<' and '>'
+	SUM         // Precedence level for '+' and '-'
+	PRODUCT     // Precedence level for '*' and '/'
+	PREFIX      // Precedence level for prefix operators like '-X' or '!X'
+	CALL        // Precedence level for function calls like 'myFunction(X)'
 )
 
-var precedences = map[token.TokenType]int{ // precedence table
+// Maps tokens to their corresponding precedence levels
+var precedences = map[token.TokenType]int{ // Precedence table
 	token.EQ:       EQUALS,
 	token.NOT_EQ:   EQUALS,
 	token.LT:       LESSGREATER,
@@ -42,25 +47,30 @@ type (
 )
 
 type Parser struct {
-	l         *lexer.Lexer
-	curToken  token.Token
-	peekToken token.Token
-	errors    []string
+	l         *lexer.Lexer // lexer that supplies the tokens
+	curToken  token.Token // The current token being examined
+	peekToken token.Token // The token being compared to the currToken, or the next token to be examined
+	errors    []string // List of errors accrued when parsing the source code
 
-	prefixParseFns map[token.TokenType]prefixParseFn
-	infixParseFns  map[token.TokenType]infixParseFn
+	prefixParseFns map[token.TokenType]prefixParseFn // Registered prefix parsing functions
+	infixParseFns  map[token.TokenType]infixParseFn // Registered infix parsing functions
 }
 
+// Associates a token type with a prefix parse function
 func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
 	p.prefixParseFns[tokenType] = fn
 }
+// Associates a token type with an infix parse function
 func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
 	p.infixParseFns[tokenType] = fn
 }
 
+// Instantiates a new instances of Parser given a lexer containing a stream of tokens from the source code
 func New(l *lexer.Lexer) *Parser {
+	// Instantiate parser object
 	p := &Parser{l: l, errors: []string{}}
 
+	// Register all prefix parsing functions
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	p.registerPrefix(token.IDENT, p.parseIdentifier)
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
@@ -70,6 +80,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.FALSE, p.parseBoolean)
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
 
+	// Register all infix parsing functions
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
 	p.registerInfix(token.MINUS, p.parseInfixExpression)
@@ -86,6 +97,7 @@ func New(l *lexer.Lexer) *Parser {
 	return p
 }
 
+// Returns the list of errors accrued when parsing
 func (p *Parser) Errors() []string {
 	return p.errors
 }
@@ -94,11 +106,13 @@ func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
 }
+
+// Parses the entire program and returns the root node of the AST
 func (p *Parser) ParseProgram() *ast.Program {
 	// Returns a list of statements given tokens
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
-	for !p.curTokenIs(token.EOF) {
+	for !p.curTokenIs(token.EOF) { // Loop until the end of input
 		stmt := p.parseStatement()
 		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
@@ -109,15 +123,18 @@ func (p *Parser) ParseProgram() *ast.Program {
 
 }
 
+// Parses and identifier and returns it as an expression node
 func (p *Parser) parseIdentifier() ast.Expression {
 	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 }
+// Evaluates which type of statement to parse based on the current token
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.LET:
 		return p.parseLetStatement()
 	case token.RETURN:
 		return p.parseReturnStatement()
+	// Unless explicitly defined as LET or RETURN, most everything is an expression
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -133,27 +150,26 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	if !p.expectPeek(token.ASSIGN) { // let x '='. next token must be an equal sign
 		return nil
 	}
-	// TODO: We're skipping the expressions until we
-	// encounter a semicolon
 	for !p.curTokenIs(token.SEMICOLON) { // let x = [expr]';'. finally, next token must be a semicolon
 		p.nextToken()
 	}
 	return stmt
 }
 func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
-	stmt := &ast.ReturnStatement{Token: p.curToken}
+	// return x + 5
+	stmt := &ast.ReturnStatement{Token: p.curToken} // return
 	p.nextToken()
-	// TODO: We're skipping the expressions until we
-	// encounter a semicolon
-	for !p.curTokenIs(token.SEMICOLON) {
-		p.nextToken()
+	for !p.curTokenIs(token.SEMICOLON) { // as long as the token the parser sees doesn't end the statement
+		// Iteration 1: expr[x + 5]
+		p.nextToken() // consume
 	}
 	return stmt
 }
+// Parses an expression as a statement
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.curToken}
 
-	stmt.Expression = p.parseExpression(LOWEST)
+	stmt.Expression = p.parseExpression(LOWEST) // Start parsing with the lowest precedence
 
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
@@ -161,13 +177,18 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 
 	return stmt
 }
+// Parses an expression given a precedence
+// The heart of the Pratt parset
 func (p *Parser) parseExpression(precedence int) ast.Expression {
-	prefix := p.prefixParseFns[p.curToken.Type]
-	if prefix == nil {
+	prefix := p.prefixParseFns[p.curToken.Type] // Lookup prefixParseFn for current token type
+	if prefix == nil { // If there isn't one, this situation is unaccounted for
 		p.noPrefixParseFnError(p.curToken.Type)
 		return nil
 	}
-	leftExp := prefix()
+
+	leftExp := prefix() // Parse the prefix expression
+
+	// Continue parsing expressions as long as they have a higher precedence and it isn't the end of the line
 	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
 		infix := p.infixParseFns[p.peekToken.Type]
 		if infix == nil {
@@ -178,9 +199,10 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	}
 	return leftExp
 }
+// Parses an integer literal and returns it as an expression node
 func (p *Parser) parseIntegerLiteral() ast.Expression {
-	lit := &ast.IntegerLiteral{Token: p.curToken}
-	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	lit := &ast.IntegerLiteral{Token: p.curToken} // Instantiates a literal value for the currToken
+	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64) // Uses strconv to parse from string to int64
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
 		p.errors = append(p.errors, msg)
@@ -189,36 +211,53 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 	lit.Value = value
 	return lit
 }
+// Parses an expression with a prefix operator: "!", "-"
 func (p *Parser) parsePrefixExpression() ast.Expression {
 	expression := &ast.PrefixExpression{
-		Token:    p.curToken,
-		Operator: p.curToken.Literal,
+		Token:    p.curToken, // The prefix operator token
+		Operator: p.curToken.Literal, // The prefix operator itself
 	}
 
+	// Advance to parse the expression that follows the prefix operator
 	p.nextToken()
 
+	// Parse the expression after the prefix operator
 	expression.Right = p.parseExpression(PREFIX)
 
 	return expression
 }
+// Parses functions with an infix operator: "+", "*", "=="...
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	expression := &ast.InfixExpression{
-		Token:    p.curToken,
-		Operator: p.curToken.Literal,
-		Left:     left,
+		Token:    p.curToken, // The infix operator token
+		Operator: p.curToken.Literal, // The infix operator itself
+		Left:     left, // The expression to the left of the infix operator
 	}
+
+	// Retreive the precedence of the infix operator
 	precedence := p.curPrecedence()
+
+	// Advance to the expression that follows the infix operator
 	p.nextToken()
+
+	// Parse the expression after the infix operator
 	expression.Right = p.parseExpression(precedence)
+
 	return expression
 }
 
+// Parses a boolean literal: "true", "false"
 func (p *Parser) parseBoolean() ast.Expression {
+	// Create a boolean node with the token's value
 	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.TRUE)}
 }
 
+// Parses an expression enclosed in parentheses
 func (p *Parser) parseGroupedExpression() ast.Expression {
+	// Advance past open parenthesis
 	p.nextToken()
+
+	// Parse the expression inside the parentheses
 	exp := p.parseExpression(LOWEST)
 	if !p.expectPeek(token.RPAREN) {
 		return nil
@@ -226,29 +265,34 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 	return exp
 }
 
+// Check for if the CURRENT token matches the sent token type (param)
 func (p *Parser) curTokenIs(t token.TokenType) bool {
 	return p.curToken.Type == t
 }
+// Check for if the PEEK token matches the sent token type (param)
 func (p *Parser) peekTokenIs(t token.TokenType) bool {
 	return p.peekToken.Type == t
 }
 
+// Checks for if the PEEK token matches the sent token type (param) and advances if it does	
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
 		return true
 	} else {
-		p.peekError(t)
+		p.peekError(t) // Record error if the token type doesn't match
 		return false
 	}
 }
 
-func (p *Parser) peekPrecedence() int { // returns the precedence of the peek token type. if it doesn't have one, defaults to lowest
+// Returns the precedence of the peek token type. Defaults to LOWEST if it doesn't have one
+func (p *Parser) peekPrecedence() int {
 	if p, ok := precedences[p.peekToken.Type]; ok {
 		return p
 	}
 	return LOWEST
 }
+// Returns the precedence of the current token type. Defaults to LOWEST if it doesn't have one
 func (p *Parser) curPrecedence() int {
 	if p, ok := precedences[p.curToken.Type]; ok {
 		return p
@@ -256,10 +300,12 @@ func (p *Parser) curPrecedence() int {
 	return LOWEST
 }
 
+// Returns an error msg if the next token doesn't match the send token type (param)
 func (p *Parser) peekError(t token.TokenType) {
 	msg := fmt.Sprintf("expected next token to be %s, got %s", t, p.peekToken.Type)
 	p.errors = append(p.errors, msg)
 }
+// Records an error message if no prefix parse function is found for the current token type
 func (p *Parser) noPrefixParseFnError(t token.TokenType) {
 	msg := fmt.Sprintf("no prefix parse function for %s found", t)
 	p.errors = append(p.errors, msg)

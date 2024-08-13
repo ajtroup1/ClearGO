@@ -1,4 +1,23 @@
 # ClearGO
+- This is my "Go" at building an interpreter for the first time. This follows Thorsten Ball's "Writing an Interpreter in Go" very closely, if not exactly.
+- My end goal is to create a compiler, which will follow along with the sequel to this book.
+- Project goals:
+    - Create a working interpreter with the following functions (as per the book):
+        - Variables
+        - Data types:
+            - Int
+            - Bool
+            - String
+            - Array
+            - Hash
+        - Arithmetic expressions
+        - Built-in library of functions
+        - First-class and Higher-order functions
+        - Closures
+    - Make good, detailed comments so others can read and understand the structure of the code without understanding Go
+    - Prepare myself for creating a compiler in Go, maybe C++ or C also
+    - Expand my understanding of Go, more specifically its features beyond basic API and testing
+    - 10X my developing skills
 
 # Notes
 
