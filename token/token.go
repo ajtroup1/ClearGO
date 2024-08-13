@@ -21,24 +21,24 @@ const (
 	INT   = "INT"   // Integer literal (e.g., 12345)
 
 	// Operators
-	ASSIGN   = "="    // Assignment operator
-	EQ       = "=="   // Equality operator
-	NOT_EQ   = "!="   // Not-equal operator
-	PLUS     = "+"    // Addition operator
-	MINUS    = "-"    // Subtraction operator
-	BANG     = "!"    // Logical negation (not) operator
-	ASTERISK = "*"    // Multiplication operator
-	SLASH    = "/"    // Division operator
-	LT       = "<"    // Less-than operator
-	GT       = ">"    // Greater-than operator
+	ASSIGN   = "="  // Assignment operator
+	EQ       = "==" // Equality operator
+	NOT_EQ   = "!=" // Not-equal operator
+	PLUS     = "+"  // Addition operator
+	MINUS    = "-"  // Subtraction operator
+	BANG     = "!"  // Logical negation (not) operator
+	ASTERISK = "*"  // Multiplication operator
+	SLASH    = "/"  // Division operator
+	LT       = "<"  // Less-than operator
+	GT       = ">"  // Greater-than operator
 
 	// Delimiters
-	COMMA     = ","   // Comma separator
-	SEMICOLON = ";"   // Semicolon separator
-	LPAREN    = "("   // Left parenthesis
-	RPAREN    = ")"   // Right parenthesis
-	LBRACE    = "{"   // Left brace (beginning of a block)
-	RBRACE    = "}"   // Right brace (end of a block)
+	COMMA     = "," // Comma separator
+	SEMICOLON = ";" // Semicolon separator
+	LPAREN    = "(" // Left parenthesis
+	RPAREN    = ")" // Right parenthesis
+	LBRACE    = "{" // Left brace (beginning of a block)
+	RBRACE    = "}" // Right brace (end of a block)
 
 	// Keywords
 	FUNCTION = "FUNCTION" // Function keyword (e.g., function definitions)

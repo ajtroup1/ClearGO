@@ -32,7 +32,7 @@ func (l *Lexer) readChar() {
 		l.ch = l.input[l.readPosition] // Read the current character
 	}
 	l.position = l.readPosition // Update the current position
-	l.readPosition += 1 // Move to the next character
+	l.readPosition += 1         // Move to the next character
 }
 
 // Returns the next token from the input stream
@@ -88,11 +88,11 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Type = token.EOF // End of file
 	default:
 		if isLetter(l.ch) {
-			tok.Literal = l.readIdentifier() // Read an identifier
+			tok.Literal = l.readIdentifier()          // Read an identifier
 			tok.Type = token.LookupIdent(tok.Literal) // Lookup identifier token type
 			return tok
 		} else if isDigit(l.ch) {
-			tok.Type = token.INT // Integer literal
+			tok.Type = token.INT         // Integer literal
 			tok.Literal = l.readNumber() // Read the number
 			return tok
 		} else {

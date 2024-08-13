@@ -379,6 +379,7 @@ func TestBooleanExpression(t *testing.T) {
 		{"false;", false},
 	}
 
+	passed := 0
 	for _, tt := range tests {
 		l := lexer.New(tt.input)
 		p := New(l)
@@ -386,24 +387,148 @@ func TestBooleanExpression(t *testing.T) {
 		checkParserErrors(t, p)
 
 		if len(program.Statements) != 1 {
-			t.Fatalf("program has not enough statements. got=%d",
+			t.Fatalf(Red+"program has not enough statements. got=%d"+Reset,
 				len(program.Statements))
 		}
 
 		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 		if !ok {
-			t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+			t.Fatalf(Red+"program.Statements[0] is not ast.ExpressionStatement. got=%T"+Reset,
 				program.Statements[0])
 		}
 
 		boolean, ok := stmt.Expression.(*ast.Boolean)
 		if !ok {
-			t.Fatalf("exp not *ast.Boolean. got=%T", stmt.Expression)
+			t.Fatalf(Red+"exp not *ast.Boolean. got=%T"+Reset, stmt.Expression)
 		}
 		if boolean.Value != tt.expectedBoolean {
-			t.Errorf("boolean.Value not %t. got=%t", tt.expectedBoolean,
+			t.Errorf(Red+"boolean.Value not %t. got=%t"+Reset, tt.expectedBoolean,
 				boolean.Value)
+		} else {
+			passed++
 		}
+	}
+	if passed/len(tests) == 1 {
+		t.Logf(Green+"%d/%d boolean tests passed"+Reset, passed, len(tests))
+	} else if passed/len(tests) < 1 && passed/len(tests) > 0 {
+		t.Logf(Yellow+"%d/%d boolean tests passed"+Reset, passed, len(tests))
+	} else {
+		t.Fatalf(Red + "No tests passed for booleans" + Reset)
+	}
+}
+
+func TestIfExpression(t *testing.T) {
+	input := `if (x < y) { x }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Body does not contain %d statements. got=%d\n", 1, len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T", program.Statements[0])
+	}
+
+	exp, ok := stmt.Expression.(*ast.IfExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not ast.IfExpression. got=%T", stmt.Expression)
+	}
+
+	if !testInfixExpression(t, exp.Condition, "x", "<", "y") {
+		logTestResult(t, false, "TestIfExpression")
+		return
+	}
+
+	if len(exp.Consequence.Statements) != 1 {
+		t.Errorf("consequence is not 1 statements. got=%d\n", len(exp.Consequence.Statements))
+	}
+
+	consequence, ok := exp.Consequence.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Statements[0] is not ast.ExpressionStatement. got=%T", exp.Consequence.Statements[0])
+	}
+
+	if !testIdentifier(t, consequence.Expression, "x") {
+		logTestResult(t, false, "TestIfExpression")
+		return
+	}
+
+	if exp.Alternative != nil {
+		t.Errorf("exp.Alternative.Statements was not nil. got=%+v", exp.Alternative)
+	}
+
+	logTestResult(t, true, "TestIfExpression")
+}
+
+// TestIfElseExpression tests if-else expressions
+func TestIfElseExpression(t *testing.T) {
+	input := `if (x < y) { x } else { y }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Body does not contain %d statements. got=%d\n", 1, len(program.Statements))
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T", program.Statements[0])
+	}
+
+	exp, ok := stmt.Expression.(*ast.IfExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not ast.IfExpression. got=%T", stmt.Expression)
+	}
+
+	if !testInfixExpression(t, exp.Condition, "x", "<", "y") {
+		logTestResult(t, false, "TestIfElseExpression")
+		return
+	}
+
+	if len(exp.Consequence.Statements) != 1 {
+		t.Errorf("consequence is not 1 statements. got=%d\n", len(exp.Consequence.Statements))
+	}
+
+	consequence, ok := exp.Consequence.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Statements[0] is not ast.ExpressionStatement. got=%T", exp.Consequence.Statements[0])
+	}
+
+	if !testIdentifier(t, consequence.Expression, "x") {
+		logTestResult(t, false, "TestIfElseExpression")
+		return
+	}
+
+	if len(exp.Alternative.Statements) != 1 {
+		t.Errorf("exp.Alternative.Statements does not contain 1 statements. got=%d\n", len(exp.Alternative.Statements))
+	}
+
+	alternative, ok := exp.Alternative.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("Statements[0] is not ast.ExpressionStatement. got=%T", exp.Alternative.Statements[0])
+	}
+
+	if !testIdentifier(t, alternative.Expression, "y") {
+		logTestResult(t, false, "TestIfElseExpression")
+		return
+	}
+
+	logTestResult(t, true, "TestIfElseExpression")
+}
+
+func logTestResult(t *testing.T, passed bool, testName string) {
+	if passed {
+		t.Logf(Green+"%s passed"+Reset, testName)
+	} else {
+		t.Logf(Red+"%s failed"+Reset, testName)
 	}
 }
 

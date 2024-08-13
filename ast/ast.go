@@ -1,5 +1,5 @@
 // Defines the AST as well as its nodes
-// Contains definitions for every node accounted for in Clear 
+// Contains definitions for every node accounted for in Clear
 package ast
 
 import (
@@ -12,7 +12,7 @@ import (
 // Absolutely ALL nodes in Clear must implement the TokenLiteral() and String() methods since they all implement Node
 type Node interface {
 	TokenLiteral() string // Returns the literal value of the given node. Used extensively and necessary for all nodes
-	String() string // Simple method that returns a string representation of the given node
+	String() string       // Simple method that returns a string representation of the given node
 }
 
 // Node containing a statement. Statements are evaulted lines such as "let x = 5", "return x"...
@@ -41,6 +41,7 @@ func (p *Program) TokenLiteral() string {
 		return ""
 	}
 }
+
 // Returns the string representation of the entire program
 // Concatentates the string representation of all the program's statements
 func (p *Program) String() string {
@@ -60,7 +61,7 @@ func (p *Program) String() string {
 type LetStatement struct {
 	Token token.Token // The token.LET token
 	Name  *Identifier // Name of the identifier: "x", "foobar"...
-	Value Expression // Value stored in the variable: "let x = 5", 5 is the value
+	Value Expression  // Value stored in the variable: "let x = 5", 5 is the value
 }
 
 func (ls *LetStatement) statementNode()       {}
@@ -87,7 +88,7 @@ func (ls *LetStatement) String() string {
 // Identifiers are treated as expressions because they represent values that can be evaluated.
 type Identifier struct {
 	Token token.Token // the token.IDENT token
-	Value string // Actual string of the name of the ident
+	Value string      // Actual string of the name of the ident
 }
 
 func (i *Identifier) expressionNode()      {}
@@ -97,7 +98,7 @@ func (i *Identifier) String() string       { return i.Value }
 // Return statement
 type ReturnStatement struct {
 	Token       token.Token // the token.RETURN token
-	ReturnValue Expression // Value being returned (to the right of "return"): "0", "x"...
+	ReturnValue Expression  // Value being returned (to the right of "return"): "0", "x"...
 }
 
 func (rs *ReturnStatement) statementNode()       {}
@@ -121,7 +122,7 @@ func (rs *ReturnStatement) String() string {
 // Represents a statement consisting of a single expression
 type ExpressionStatement struct {
 	Token      token.Token // The first token of the expression
-	Expression Expression // The expression itself
+	Expression Expression  // The expression itself
 }
 
 func (es *ExpressionStatement) statementNode()       {}
@@ -147,8 +148,8 @@ func (il *IntegerLiteral) String() string       { return il.Token.Literal }
 // Represents ant prefix expression. In Clear, these are only "!" and "-"
 type PrefixExpression struct {
 	Token    token.Token // The prefix token: "!", "-"
-	Operator string // The actual operator representaion
-	Right    Expression // Expression to the right of the operator: In "!myFunction()" the "myFunction()" would be 'Right'
+	Operator string      // The actual operator representaion
+	Right    Expression  // Expression to the right of the operator: In "!myFunction()" the "myFunction()" would be 'Right'
 }
 
 func (pe *PrefixExpression) expressionNode()      {}
@@ -167,9 +168,9 @@ func (pe *PrefixExpression) String() string {
 type InfixExpression struct {
 	// EX. "1 + 2"
 	Token    token.Token // Token represents the operator token in the infix expression: "+", "*"...
-	Left     Expression // The left 'value' of the expression: "1"
-	Operator string // The operator in the expression: "+"
-	Right    Expression // The right 'value' of the expression: "2"
+	Left     Expression  // The left 'value' of the expression: "1"
+	Operator string      // The operator in the expression: "+"
+	Right    Expression  // The right 'value' of the expression: "2"
 }
 
 func (oe *InfixExpression) expressionNode()      {}
@@ -188,9 +189,51 @@ func (oe *InfixExpression) String() string {
 // Represents a boolean value: true, false
 type Boolean struct {
 	Token token.Token // The token.TRUE or token.FALSE token
-	Value bool // The GO value of the given token
+	Value bool        // The GO value of the given token
 }
 
 func (b *Boolean) expressionNode()      {}
 func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
 func (b *Boolean) String() string       { return b.Token.Literal }
+
+// Represents an if expression
+// If expressions contain an if token, a condition to be rendered, something that happens if it renders true, and optionally an alternative for if it renders false
+type IfExpression struct {
+	Token       token.Token     // The 'if' token
+	Condition   Expression      // What is being evaluated. Can be any expression
+	Consequence *BlockStatement // What happens if the condition is true
+	Alternative *BlockStatement // What happens if the condition is false
+}
+
+func (ie *IfExpression) expressionNode()      {}
+func (ie *IfExpression) TokenLiteral() string { return ie.Token.Literal }
+func (ie *IfExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("if")
+	out.WriteString(ie.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(ie.Consequence.String())
+	if ie.Alternative != nil {
+		out.WriteString("else ")
+		out.WriteString(ie.Alternative.String())
+	}
+	return out.String()
+}
+
+// Represents a block statement, which is just a series a statements
+// Like in if else possibly containing a list of statements to execute depending on a result
+type BlockStatement struct {
+	Token      token.Token // the { token
+	Statements []Statement
+}
+
+func (bs *BlockStatement) statementNode()       {}
+func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BlockStatement) String() string {
+	var out bytes.Buffer
+	for _, s := range bs.Statements {
+		// Output each statement present in the slice
+		out.WriteString(s.String())
+	}
+	return out.String()
+}
