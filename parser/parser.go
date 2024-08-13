@@ -34,7 +34,7 @@ var precedences = map[token.TokenType]int{ // Precedence table
 	token.MINUS:    SUM,
 	token.SLASH:    PRODUCT,
 	token.ASTERISK: PRODUCT,
-	token.LPAREN: CALL,
+	token.LPAREN:   CALL,
 }
 
 type (
@@ -83,7 +83,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
-	
+
 	// Register all infix parsing functions
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
@@ -145,29 +145,34 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseExpressionStatement()
 	}
 }
+
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	// let x = 5
-	// 'let' is obviously the first word
-	stmt := &ast.LetStatement{Token: p.curToken}
-	if !p.expectPeek(token.IDENT) { // let 'x'. next token must be an identifier
+	stmt := &ast.LetStatement{Token: p.curToken} // Let token
+	// Identifier (x, y ...) follows let keyword
+	if !p.expectPeek(token.IDENT) {
 		return nil
 	}
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	if !p.expectPeek(token.ASSIGN) { // let x '='. next token must be an equal sign
+	// "=" follows the identifier
+	if !p.expectPeek(token.ASSIGN) {
 		return nil
 	}
-	for !p.curTokenIs(token.SEMICOLON) { // let x = [expr]';'. finally, next token must be a semicolon
+	p.nextToken()
+	// And any expression follows the "="
+	stmt.Value = p.parseExpression(LOWEST)
+	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
 	}
 	return stmt
 }
+
 func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
-	// return x + 5
-	stmt := &ast.ReturnStatement{Token: p.curToken} // return
+	stmt := &ast.ReturnStatement{Token: p.curToken} // Return token
 	p.nextToken()
-	for !p.curTokenIs(token.SEMICOLON) { // as long as the token the parser sees doesn't end the statement
-		// Iteration 1: expr[x + 5]
-		p.nextToken() // consume
+	stmt.ReturnValue = p.parseExpression(LOWEST)
+	if p.peekTokenIs(token.SEMICOLON) { // As long as the next token doesn't end the statement
+		p.nextToken()
 	}
 	return stmt
 }
