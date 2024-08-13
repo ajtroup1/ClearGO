@@ -34,6 +34,7 @@ var precedences = map[token.TokenType]int{ // Precedence table
 	token.MINUS:    SUM,
 	token.SLASH:    PRODUCT,
 	token.ASTERISK: PRODUCT,
+	token.LPAREN: CALL,
 }
 
 type (
@@ -82,7 +83,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
-
+	
 	// Register all infix parsing functions
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.PLUS, p.parseInfixExpression)
@@ -93,6 +94,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
 	p.registerInfix(token.LT, p.parseInfixExpression)
 	p.registerInfix(token.GT, p.parseInfixExpression)
+	p.registerInfix(token.LPAREN, p.parseCallExpression)
 
 	// Read two tokens, so curToken and peekToken are both set
 	p.nextToken()
@@ -377,6 +379,39 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 		return nil
 	}
 	return identifiers
+}
+
+// Parses the call to a defined function
+func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
+	// Instantiate a call expression with a given function
+	exp := &ast.CallExpression{Token: p.curToken, Function: function}
+	// Parse the arguments list
+	exp.Arguments = p.parseCallArguments()
+	return exp
+}
+
+// Parses the list of function call arguments and returns them as a slice of expression
+// Works similarly to parseFunctionParameters() above
+func (p *Parser) parseCallArguments() []ast.Expression {
+	// Instantiate the slice
+	args := []ast.Expression{}
+	// Arguments list must be encased in parentheses
+	if p.peekTokenIs(token.RPAREN) {
+		p.nextToken()
+		// If not, return the empty slice
+		return args
+	}
+	p.nextToken()
+	args = append(args, p.parseExpression(LOWEST))
+	for p.peekTokenIs(token.COMMA) { // Continue through comma separated list and parse the individual arguments
+		p.nextToken()
+		p.nextToken()
+		args = append(args, p.parseExpression(LOWEST))
+	}
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+	return args
 }
 
 // Check for if the CURRENT token matches the sent token type (param)
