@@ -23,6 +23,13 @@ func logTestResult(t *testing.T, passed bool, testName string) {
 	}
 }
 
+func testEval(input string) object.Object {
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	return Eval(program)
+}
+
 func TestEvalIntegerExpression(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -30,6 +37,8 @@ func TestEvalIntegerExpression(t *testing.T) {
 	}{
 		{"5", 5},
 		{"10", 10},
+		{"-5", -5},
+		{"-10", -10},
 	}
 
 	passed := true
@@ -41,13 +50,6 @@ func TestEvalIntegerExpression(t *testing.T) {
 	}
 
 	logTestResult(t, passed, "TestEvalIntegerExpression")
-}
-
-func testEval(input string) object.Object {
-	l := lexer.New(input)
-	p := parser.New(l)
-	program := p.ParseProgram()
-	return Eval(program)
 }
 
 func testIntegerObject(t *testing.T, obj object.Object, expected int64) bool {
@@ -104,8 +106,18 @@ func TestBangOperator(t *testing.T) {
 		{"!!false", false},
 		{"!!5", true},
 	}
+
+	passed := true
 	for _, tt := range tests {
 		evaluated := testEval(tt.input)
-		testBooleanObject(t, evaluated, tt.expected)
+		if !testBooleanObject(t, evaluated, tt.expected) {
+			passed = false
+		}
+	}
+
+	if passed {
+		logTestResult(t, true, "TestBangOperator")
+	} else {
+		logTestResult(t, false, "TestBangOperator")
 	}
 }
