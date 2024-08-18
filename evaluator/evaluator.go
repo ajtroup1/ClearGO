@@ -1,6 +1,8 @@
 package evaluator
 
 import (
+	"fmt"
+
 	"github.com/ajtroup1/clearv2/ast"
 	"github.com/ajtroup1/clearv2/object"
 )
@@ -18,7 +20,7 @@ func Eval(node ast.Node) object.Object {
 	// Statements
 	// **Initially evalute the entire program recursively by passing the ast.Program's slice of statements
 	case *ast.Program:
-		return evalStatements(node.Statements)
+		return evalProgram(node)
 	case *ast.ExpressionStatement:
 		return Eval(node.Expression)
 	// Expressions
@@ -34,24 +36,44 @@ func Eval(node ast.Node) object.Object {
 		right := Eval(node.Right)
 		return evalInfixExpression(node.Operator, left, right)
 	case *ast.BlockStatement:
-		return evalStatements(node.Statements)
+		return evalBlockStatement(node)
 	case *ast.IfExpression:
 		return evalIfExpression(node)
+	case *ast.ReturnStatement:
+		val := Eval(node.ReturnValue)
+		return &object.ReturnValue{Value: val}
 	}
 
 	// Unrecognized
 	return nil
 }
 
-// Receives a list of statements and returns them one by one
-func evalStatements(stmts []ast.Statement) object.Object {
+func evalProgram(program *ast.Program) object.Object {
 	var result object.Object
-	// Initially, evalute the entire slice of statements in the program
-	for _, statement := range stmts {
+	for _, statement := range program.Statements {
 		result = Eval(statement)
+		switch result := result.(type) {
+		case *object.ReturnValue:
+			return result.Value
+		case *object.Error:
+			return result
+		}
 	}
 	return result
 }
+
+// Receives a list of statements and returns them one by one
+// func evalStatements(stmts []ast.Statement) object.Object {
+// 	var result object.Object
+// 	// Initially, evalute the entire slice of statements in the program
+// 	for _, statement := range stmts {
+// 		result = Eval(statement)
+// 		if returnValue, ok := result.(*object.ReturnValue); ok {
+// 			return returnValue.Value
+// 		}
+// 	}
+// 	return result
+// }
 
 // Converts native boolean to our boolean object
 func nativeBoolToBooleanObject(input bool) *object.Boolean {
@@ -69,7 +91,7 @@ func evalPrefixExpression(operator string, right object.Object) object.Object {
 	case "-":
 		return evalMinusPrefixOperatorExpression(right)
 	default:
-		return NULL
+		return newError("unknown operator: %s%s", operator, right.Type())
 	}
 }
 
@@ -90,7 +112,7 @@ func evalBangOperatorExpression(right object.Object) object.Object {
 // Evaluates the native negaitve prefix operator to the right expression operand
 func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
 	if right.Type() != object.INTEGER_OBJ {
-		return NULL
+		return newError("unknown operator: -%s", right.Type())
 	}
 	value := right.(*object.Integer).Value
 	return &object.Integer{Value: -value}
@@ -107,8 +129,11 @@ func evalInfixExpression(
 		return nativeBoolToBooleanObject(left == right)
 	case operator == "!=":
 		return nativeBoolToBooleanObject(left != right)
+	case left.Type() != right.Type():
+		return newError("type mismatch: %s %s %s",
+		left.Type(), operator, right.Type())
 	default:
-		return NULL
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 }
 
@@ -136,7 +161,8 @@ func evalIntegerInfixExpression(
 	case "!=":
 		return nativeBoolToBooleanObject(leftVal != rightVal)
 	default:
-		return NULL
+		return newError("unknown operator: %s %s %s",
+		left.Type(), operator, right.Type())
 	}
 }
 
@@ -162,4 +188,22 @@ func isTruthy(obj object.Object) bool {
 	default:
 		return true
 	}
+}
+
+func evalBlockStatement(block *ast.BlockStatement) object.Object {
+	var result object.Object
+	for _, statement := range block.Statements {
+		result = Eval(statement)
+		if result != nil {
+			rt := result.Type()
+			if rt == object.RETURN_VALUE_OBJ || rt == object.ERROR_OBJ {
+				return result
+			}
+		}
+	}
+	return result
+}
+
+func newError(format string, a ...interface{}) *object.Error {
+	return &object.Error{Message: fmt.Sprintf(format, a...)}
 }
